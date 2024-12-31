@@ -9,7 +9,7 @@ import Compressor from 'compressorjs';
 import StatusFilter from './StatusFilter';
 import { Timestamp } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
-
+import { fetchWithAuth} from '@/lib/api';
 interface APIDocument {
   thumbnailUrl: string;
   text: string;
@@ -136,68 +136,85 @@ function Dashboard() {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0 || !user) return;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
     setError(null);
 
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        // Create a new progress tracker for this file
-        const progressId = Math.random().toString(36).substring(7);
-        setUploadProgress(prev => ({ ...prev, [progressId]: 0 }));
-
-        try {
-          // Compress the image before upload
-          const compressedFile = await new Promise<File>((resolve, reject) => {
-            new Compressor(file, {
-              quality: 0.8,
-              success: (result) => {
-                resolve(new File([result], file.name, { type: result.type }));
-              },
-              error: (err) => {
-                reject(err);
-              },
-            });
+      const formData = new FormData();
+      
+      // Process each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Create thumbnail version
+        const thumbnailFile = await new Promise<File>((resolve, reject) => {
+          new Compressor(file, {
+            quality: 0.6,
+            maxWidth: 200,
+            maxHeight: 200,
+            success: (result) => {
+              resolve(new File([result], file.name, { type: result.type }));
+            },
+            error: reject,
           });
+        });
 
-          // Update progress as the file uploads
-          const onProgress = (progress: number) => {
-            setUploadProgress(prev => ({ ...prev, [progressId]: progress }));
-          };
-
-          // Upload the file
-          await uploadFile(compressedFile, onProgress);
-
-          // Remove this file's progress tracker
-          setUploadProgress(prev => {
-            const { [progressId]: removed, ...rest } = prev;
-            return rest;
+        // Create optimized original version
+        const originalFile = await new Promise<File>((resolve, reject) => {
+          new Compressor(file, {
+            quality: 0.8,
+            maxWidth: 1920,
+            maxHeight: 1920,
+            success: (result) => {
+              resolve(new File([result], file.name, { type: result.type }));
+            },
+            error: reject,
           });
+        });
 
-        } catch (error) {
-          console.error('Error uploading file:', error);
-          throw error;
-        }
+        // Append files with the correct keys
+        formData.append(`images[${i}].original`, originalFile);
+        formData.append(`images[${i}].thumbnail`, thumbnailFile);
+      }
+
+      // Get the current user's token
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      const token = await user.getIdToken();
+
+      // Send the upload request
+      const response = await fetch(`${config.api.upload}/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
       });
 
-      await Promise.all(uploadPromises);
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
 
-      // Refresh the document list after successful upload
+      const result1 = await response.json();
+      
+      // Refresh the documents list
       const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
       setDocuments(result.documents);
       setHasMore(result.hasMore);
       setHasPrevious(result.hasPrevious);
-
-    } catch (error) {
-      console.error('Error handling files:', error);
-      setError('An error occurred while uploading files');
-    } finally {
+      
       setIsUploading(false);
-      setUploadProgress({});
+      // Clear the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    } catch (error) {
+      setIsUploading(false);
+      setError(error instanceof Error ? error.message : 'Failed to upload files');
     }
   };
 
@@ -411,7 +428,7 @@ function Dashboard() {
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div className="ml-3">

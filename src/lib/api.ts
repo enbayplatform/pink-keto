@@ -1,6 +1,6 @@
 import { auth } from '@/lib/firebase';
 import config from '@/config';
-import { auth } from './firebase';
+// import { auth } from './firebase';
 
 interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
