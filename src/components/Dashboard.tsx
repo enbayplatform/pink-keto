@@ -3,13 +3,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
+import { fetchWithAuth } from '@/lib/api';
 import config from '@/config';
-import { loadFirstPage, loadNextPage, loadPreviousPage, getSearchState } from '@/lib/firebaseSearch';
 import Compressor from 'compressorjs';
 import StatusFilter from './StatusFilter';
 import { Timestamp } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
-import { fetchWithAuth} from '@/lib/api';
+import { handleFileChange, handleScan, handleTest, Document } from '@/lib/handlers';
+import { loadFirstPage, loadNextPage, loadPreviousPage, getSearchState } from '@/lib/firebaseSearch';
+
 interface APIDocument {
   thumbnailUrl: string;
   text: string;
@@ -36,6 +38,7 @@ function Dashboard() {
   const [documents, setDocuments] = useState<APIDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [hasPrevious, setHasPrevious] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -134,131 +137,36 @@ function Dashboard() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const onFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    await handleFileChange(event.target.files, {
+      setIsUploading,
+      setError,
+      setSuccessMessage: (message: string) => setSuccessMessage(message),
+      fileInputRef,
+      loadFirstPage,
+      currentStatus,
+      setDocuments,
+      setHasMore,
+      setHasPrevious
+    });
+  };
 
-    setIsUploading(true);
-    setError(null);
-
+  const onScan = async () => {
     try {
-      const formData = new FormData();
-      
-      // Process each file
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        // Create thumbnail version
-        const thumbnailFile = await new Promise<File>((resolve, reject) => {
-          new Compressor(file, {
-            quality: 0.6,
-            maxWidth: 200,
-            maxHeight: 200,
-            success: (result) => {
-              resolve(new File([result], file.name, { type: result.type }));
-            },
-            error: reject,
-          });
-        });
-
-        // Create optimized original version
-        const originalFile = await new Promise<File>((resolve, reject) => {
-          new Compressor(file, {
-            quality: 0.8,
-            maxWidth: 1920,
-            maxHeight: 1920,
-            success: (result) => {
-              resolve(new File([result], file.name, { type: result.type }));
-            },
-            error: reject,
-          });
-        });
-
-        // Append files with the correct keys
-        formData.append(`images[${i}].original`, originalFile);
-        formData.append(`images[${i}].thumbnail`, thumbnailFile);
-      }
-
-      // Get the current user's token
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-      const token = await user.getIdToken();
-
-      // Send the upload request
-      const response = await fetch(`${config.api.upload}/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const result1 = await response.json();
-      
-      // Refresh the documents list
+      await handleScan();
+      // Refresh the documents list after scanning
       const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
       setDocuments(result.documents);
-      setHasMore(result.hasMore);
-      setHasPrevious(result.hasPrevious);
-      
-      setIsUploading(false);
-      // Clear the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     } catch (error) {
-      setIsUploading(false);
-      setError(error instanceof Error ? error.message : 'Failed to upload files');
+      setError(error instanceof Error ? error.message : 'Failed to scan document');
     }
   };
 
-  const handleScan = async () => {
+  const onTest = async () => {
     try {
-      const { data, error } = await fetchWithAuth(config.api.scan, {
-        method: 'POST',
-        body: {
-          documentIds: documents.map(doc => doc.userId)
-        }
-      });
-
-      if (error) {
-        console.error('Scan failed:', error);
-        alert('Scan failed: ' + error);
-      } else {
-        console.log('Scan initiated:', data);
-        alert('Scan initiated successfully!');
-      }
+      await handleTest();
     } catch (error) {
-      console.error('Error during scan:', error);
-      alert('Error during scan: ' + error);
-    }
-  };
-
-  const handleTest = async () => {
-    try {
-      const { data, error } = await fetchWithAuth(config.api.hello, {
-        method: 'POST',
-        body: {
-          documentIds: documents.map(doc => doc.userId)
-        }
-      });
-
-      if (error) {
-        console.error('Scan failed:', error);
-        alert('Scan failed: ' + error);
-      } else {
-        console.log('Scan initiated:', data);
-        alert('Scan initiated successfully!');
-      }
-    } catch (error) {
-      console.error('Error during scan:', error);
-      alert('Error during scan: ' + error);
+      setError(error instanceof Error ? error.message : 'Test failed');
     }
   };
 
@@ -359,7 +267,7 @@ function Dashboard() {
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleFileChange}
+        onChange={onFileChange}
         className="hidden"
         accept="image/*"
         multiple
@@ -407,13 +315,13 @@ function Dashboard() {
               )}
             </button>
             <button
-              onClick={handleScan}
+              onClick={onScan}
               className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 ml-2"
             >
               Scan
             </button>
             <button
-              onClick={handleTest}
+              onClick={onTest}
               className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 ml-2"
             >
               Test
@@ -436,6 +344,13 @@ function Dashboard() {
               <div className="mt-2 text-sm text-red-700">{error}</div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+          {successMessage}
         </div>
       )}
 
