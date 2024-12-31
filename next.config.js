@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    FIREBASE_MODE: process.env.FIREBASE_MODE || 'emulator'
+  },
   images: {
     remotePatterns: [
       {
@@ -10,6 +13,16 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'firebasestorage.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'fastly.picsum.photos',
         pathname: '/**',
       },
     ],

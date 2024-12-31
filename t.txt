@@ -1,0 +1,16 @@
+[
+    {"documentChange":
+    {"document":
+{"name":"projects/boringketo/databases/(default)/documents/documents/YJNbYoytqEvo2RidReZz",
+
+"fields":
+{"thumbnailUrlGS":{"stringValue":"gs://test-bucket/thumbnail_149.jpg"},"updatedAt":{"timestampValue":"2024-12-30T06:57:47.736167Z"},
+"status":{"stringValue":"pending"},
+"createdAt":{"timestampValue":"2024-12-30T06:57:47.736167Z"},
+"userId":{"stringValue":"Kb4ztCl6O8geBUsoC6oDh5UguNKm"},
+"originalUrlGS":{"stringValue":"gs://test-bucket/original_149.jpg"},
+"thumbnailUrl":{"stringValue":"https://picsum.photos/`200/300"},
+"text":{"stringValue":"Invoice 149 description, some keywords to search: apple banana cherry 149"}
+},
+"createTime":"2024-12-30T06:57:47.905468Z",
+"updateTime":"2024-12-30T06:57:47.905468Z"},"targetIds":[8]}}]],

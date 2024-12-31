@@ -3,13 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_ENV=development next dev",
+    "dev:live": "FIREBASE_MODE=live next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@firebase/auth": "^1.8.1",
+    "compressorjs": "^1.2.1",
     "firebase": "^11.0.2",
     "next": "^15.0.3",
     "react": "^18.2.0",

@@ -1,0 +1,3 @@
+T`o ensure Next.js is running in development mode, you can explicitly set the NODE_ENV when starting the development server:
+
+NODE_ENV=development npm run dev
