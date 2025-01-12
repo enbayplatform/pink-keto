@@ -20,6 +20,16 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// Set custom Storage settings
+const storageSettings = {
+  customHeaders: {
+    'X-Firebase-Storage-XSRF': '1'
+  }
+};
+
+// Apply settings to storage instance
+(storage as any)._customHeaders = storageSettings.customHeaders;
+
 // Connect to Firebase emulators in development mode only
 if (process.env.FIREBASE_MODE === 'live') {
   console.log('Connecting to production Firebase backend.');

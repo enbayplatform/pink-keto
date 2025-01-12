@@ -9,33 +9,35 @@ import Compressor from 'compressorjs';
 import StatusFilter from './StatusFilter';
 import { Timestamp } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
-import { handleFileChange, handleScan, handleTest, Document } from '@/lib/handlers';
-import { loadFirstPage, loadNextPage, loadPreviousPage, getSearchState } from '@/lib/firebaseSearch';
+import { handleFileChange, handleScan, handleRescan } from '@/lib/handlers';
+import { loadFirstPage, loadNextPage, loadPreviousPage, getSearchState, searchDocuments } from '@/lib/firebaseSearch';
+import { deleteDocument } from '@/lib/document';
+import { Document } from '../lib/document';
 
-interface APIDocument {
-  thumbnailUrl: string;
-  text: string;
-  status: string;
-  createdAt: string;
-  id: string;
-  userId: string;
-}
+// interface APIDocument {
+//   thumbnailUrl: string;
+//   text: string;
+//   status: string;
+//   createdAt: string;
+//   id: string;
+//   userId: string;
+// }
 
-interface APIResponse {
-  data: APIDocument[] | null;
-  error: string | null;
-}
+// interface APIResponse {
+//   data: APIDocument[] | null;
+//   error: string | null;
+// }
 
-interface UploadDataItem {
-  fileId: string | number;
-  original: File;
-  thumbnail: File;
-}
+// interface UploadDataItem {
+//   fileId: string | number;
+//   original: File;
+//   thumbnail: File;
+// }
 
 function Dashboard() {
   const { user } = useAuth();
   const [currentStatus, setCurrentStatus] = useState('all');
-  const [documents, setDocuments] = useState<APIDocument[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -151,22 +153,22 @@ function Dashboard() {
     });
   };
 
-  const onScan = async () => {
+  const onRefresh = async () => {
     try {
-      await handleScan();
-      // Refresh the documents list after scanning
-      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
+      setIsLoading(true);
+      setError(null);
+      // Get the current status from the StatusFilter component
+      const status = currentStatus === 'all' ? null : currentStatus;
+      const result = await loadFirstPage(status);
       setDocuments(result.documents);
+      setHasMore(result.hasMore);
+      setHasPrevious(result.hasPrevious);
+      setSuccessMessage('Documents refreshed successfully');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to scan document');
-    }
-  };
-
-  const onTest = async () => {
-    try {
-      await handleTest();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Test failed');
+      console.error('Error refreshing documents:', error);
+      setError('Failed to refresh documents');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -261,6 +263,50 @@ function Dashboard() {
     }
   };
 
+  const handleDelete = async (documentId: string) => {
+    // Show confirmation dialog
+    const confirmDelete = window.confirm('Are you sure you want to delete this document?');
+    
+    if (!confirmDelete) {
+      return; // User cancelled deletion
+    }
+
+    try {
+      setIsLoading(true);
+      await deleteDocument(documentId);
+      
+      // Refresh the documents list after deletion
+      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
+      setDocuments(result.documents);
+      setHasMore(result.hasMore);
+      setHasPrevious(result.hasPrevious);
+      
+      setSuccessMessage('Document deleted successfully');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to delete document');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRescanDocument = async (documentId: string) => {
+    try {
+      setIsLoading(true);
+      await handleRescan(documentId);
+      setSuccessMessage('Document rescan initiated successfully');
+      
+      // Refresh the documents list to show updated status
+      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
+      setDocuments(result.documents);
+      setHasMore(result.hasMore);
+      setHasPrevious(result.hasPrevious);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to rescan document');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Hidden file input */}
@@ -315,16 +361,10 @@ function Dashboard() {
               )}
             </button>
             <button
-              onClick={onScan}
+              onClick={onRefresh}
               className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 ml-2"
             >
-              Scan
-            </button>
-            <button
-              onClick={onTest}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 ml-2"
-            >
-              Test
+              Refresh
             </button>
           </div>
         </div>
@@ -335,7 +375,7 @@ function Dashboard() {
         <div className="mb-4 p-4 bg-red-50 rounded-lg">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -424,18 +464,22 @@ function Dashboard() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex space-x-2">
-                                  <button className="p-1 hover:bg-gray-100 rounded" title="View">
+                                  <button 
+                                    className="p-1 hover:bg-gray-100 rounded" 
+                                    title="Re-scan"
+                                    onClick={() => handleRescanDocument(doc.id)}
+                                    disabled={isLoading}
+                                  >
                                     <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
                                   </button>
-                                  <button className="p-1 hover:bg-gray-100 rounded" title="Edit">
-                                    <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                  </button>
-                                  <button className="p-1 hover:bg-gray-100 rounded" title="Delete">
+                                  <button 
+                                    className="p-1 hover:bg-gray-100 rounded" 
+                                    title="Delete"
+                                    onClick={() => handleDelete(doc.id)}
+                                    disabled={isLoading}
+                                  >
                                     <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
@@ -532,19 +576,16 @@ function Dashboard() {
         )}
       </div>
 
-      {/* Text Popup Modal */}
-      {showTextPopup && selectedDocIndex !== null && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 relative">
+      {/* Document detail modal */}
+      {selectedDocIndex !== null && showTextPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh]">
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Document Text</h3>
+                <h3 className="text-lg font-semibold">Document Details</h3>
                 <button
-                  onClick={() => {
-                    setShowTextPopup(false);
-                    setSelectedDocIndex(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-500"
+                  onClick={() => setShowTextPopup(false)}
+                  className="text-gray-500 hover:text-gray-700"
                 >
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -552,50 +593,33 @@ function Dashboard() {
                 </button>
               </div>
             </div>
-            
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
-              <p className="text-gray-700 whitespace-pre-wrap">
-                {documents[selectedDocIndex].text}
-              </p>
-            </div>
 
-            <div className="px-4 py-3 bg-gray-50 flex justify-between items-center rounded-b-lg">
-              <button
-                onClick={() => selectedDocIndex > 0 && setSelectedDocIndex(selectedDocIndex - 1)}
-                disabled={selectedDocIndex <= 0}
-                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                  selectedDocIndex > 0
-                    ? 'text-gray-700 bg-white hover:bg-gray-50 border border-gray-300'
-                    : 'text-gray-400 bg-gray-100 cursor-not-allowed border border-gray-200'
-                }`}
-              >
-                <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Previous
-              </button>
+            <div className="flex h-[calc(90vh-5rem)]">
+              {/* Left side - Document Image */}
+              <div className="w-1/2 border-r border-gray-200 p-4">
+                <div className="h-full relative bg-gray-50 rounded-lg">
+                  <img
+                    src={documents[selectedDocIndex].thumbnailUrl}
+                    alt="Document preview"
+                    className="rounded-lg object-contain w-full h-full"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = documents[selectedDocIndex].thumbnailUrl + '&t=' + new Date().getTime();
+                    }}
+                  />
+                </div>
+              </div>
 
-              <span className="text-sm text-gray-500">
-                {selectedDocIndex + 1} of {documents.length}
-              </span>
-
-              <button
-                onClick={() => 
-                  selectedDocIndex < documents.length - 1 && 
-                  setSelectedDocIndex(selectedDocIndex + 1)
-                }
-                disabled={selectedDocIndex >= documents.length - 1}
-                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                  selectedDocIndex < documents.length - 1
-                    ? 'text-gray-700 bg-white hover:bg-gray-50 border border-gray-300'
-                    : 'text-gray-400 bg-gray-100 cursor-not-allowed border border-gray-200'
-                }`}
-              >
-                Next
-                <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+              {/* Right side - Extracted Text */}
+              <div className="w-1/2 p-4">
+                <h4 className="font-medium mb-2">Extracted Text:</h4>
+                <div className="h-[calc(100%-2rem)] overflow-y-auto">
+                  <div className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap">
+                    {documents[selectedDocIndex].text || 'No text extracted yet'}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

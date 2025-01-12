@@ -1,0 +1,24 @@
+[
+    {
+      "origin": ["*"],
+      "method": ["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
+      "maxAgeSeconds": 3600,
+      "responseHeader": [
+        "Content-Type",
+        "Content-Length",
+        "Content-Range",
+        "Content-Disposition",
+        "Cache-Control",
+        "Date",
+        "Expires",
+        "Server",
+        "Transfer-Encoding",
+        "X-Firebase-Storage-XSRF",
+        "X-GUploader-UploadID",
+        "X-Google-Trace",
+        "Access-Control-Allow-Origin",
+        "Authorization"
+      ]
+    }
+  ]
+

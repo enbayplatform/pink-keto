@@ -3,7 +3,7 @@ interface Config {
     upload: string;
     scan: string;
     hello: string;
-
+    rescan: string;
   };
 }
 
@@ -29,8 +29,8 @@ const config: Config = {
   api: {
     hello: !USE_PRODUCTION ? `${LOCAL_API_BASE}/hello2` : `https://hello2${PRODUCTION_API_BASE}`,
     upload: !USE_PRODUCTION ? `${LOCAL_API_BASE}/upload` : `https://upload${PRODUCTION_API_BASE}`,
-    scan: !USE_PRODUCTION ? `${LOCAL_API_BASE}/scan` : `https://scan${PRODUCTION_API_BASE}`
-
+    scan: !USE_PRODUCTION ? `${LOCAL_API_BASE}/scan` : `https://scan${PRODUCTION_API_BASE}`,
+    rescan: !USE_PRODUCTION ? `${LOCAL_API_BASE}/rescan` : `https://rescan${PRODUCTION_API_BASE}`
   },
 };
 

@@ -7,10 +7,25 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /users/{userId}/{allPaths=**} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null 
-        && request.auth.uid == userId
+      allow write, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    match /images/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null 
         && request.resource.size < 5 * 1024 * 1024 // 5MB
         && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null 
+        && exists(/databases/$(database)/documents/documents/$(request.path.segments[1].split('-')[0]))
+        && get(/databases/$(database)/documents/documents/$(request.path.segments[1].split('-')[0])).data.userId == request.auth.uid;
+    }
+    match /images/thumb/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null 
+        && request.resource.size < 5 * 1024 * 1024 // 5MB
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null 
+        && exists(/databases/$(database)/documents/documents/$(request.path.segments[2].split('-')[0]))
+        && get(/databases/$(database)/documents/documents/$(request.path.segments[2].split('-')[0])).data.userId == request.auth.uid;
     }
   }
 }

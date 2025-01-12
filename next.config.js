@@ -17,12 +17,27 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'storage.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'picsum.photos',
         pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'fastly.picsum.photos',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
         pathname: '/**',
       },
     ],
