@@ -1,11 +1,12 @@
-import { auth } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import config from '@/config';
 import Compressor from 'compressorjs';
 import { fetchWithAuth } from './api';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { getFirestore, collection, addDoc, serverTimestamp, doc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, doc, deleteDoc, runTransaction } from 'firebase/firestore';
 import randomName from './utils'
 import { Document } from './document';
+import { checkUserCredits } from './credit';
 
 // Document collection and status constants
 export const DOCUMENT_COLLECTION = 'documents';
@@ -14,6 +15,27 @@ export const DOCUMENT_STATUS_PENDING = 'pending';
 export const DOCUMENT_STATUS_PROCESSING = 'processing';
 export const DOCUMENT_STATUS_COMPLETE = 'complete';
 export const DOCUMENT_STATUS_FAILED = 'failed';
+
+async function getNextDocumentId(): Promise<number> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+  const userId = user.uid;
+  const counterRef = doc(db, 'userCounters', userId);
+  
+  const newCount = await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    const currentCount = counterDoc.exists() ? counterDoc.data().count : 0;
+    const nextCount = currentCount + 1;
+    
+    transaction.set(counterRef, { count: nextCount }, { merge: true });
+    
+    return nextCount;
+  });
+  
+  return newCount;
+}
 
 export const handleFileChange = async (
   files: FileList | null,
@@ -41,18 +63,35 @@ export const handleFileChange = async (
     setHasPrevious
   } = options;
 
-  if (!files || files.length === 0) return;
+  if (!files || files.length === 0) {
+    setIsUploading(false);
+    return;
+  }
 
   setIsUploading(true);
   setError(null);
 
   try {
-    const storage = getStorage();
-    const firestore = getFirestore();
     const user = auth.currentUser;
 
     if (!user) {
-      throw new Error('User not authenticated');
+      setError('User not authenticated');
+      setIsUploading(false);
+      return;
+    }
+
+    // Check credits before proceeding with upload
+    try {
+      const hasCredits = await checkUserCredits(user.uid);
+      if (!hasCredits) {
+        setError('Insufficient credits. Please purchase more credits to continue.');
+        setIsUploading(false);
+        return;
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred while checking credits');
+      setIsUploading(false);
+      return;
     }
 
     const userId = user.uid;
@@ -151,8 +190,9 @@ export const handleFileChange = async (
       ]);
 
       // Create document in Firestore
-      const docRef = await addDoc(collection(firestore, 'documents'), {
+      const docRef = await addDoc(collection(db, 'documents'), {
         userId,
+        docId: await getNextDocumentId(),
         originalGS: originalGsUrl,
         thumbnailGS: thumbnailGsUrl,
         thumbnailUrl,
@@ -191,6 +231,7 @@ export const handleFileChange = async (
   } catch (error) {
     console.error('Upload error:', error);
     setError(error instanceof Error ? error.message : 'Failed to upload file');
+    setIsUploading(false);
   } finally {
     setIsUploading(false);
   }

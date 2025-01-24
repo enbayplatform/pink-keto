@@ -20,7 +20,7 @@ else{
 }
 //https://hello2-111834125610.us-central1.run.app/
 
-const LOCAL_API_BASE = 'http://127.0.0.1:5001/boringketo/us-central1';
+const LOCAL_API_BASE = 'http://127.0.0.1:5001/boringketo/asia-east1';// 'http://127.0.0.1:5001/boringketo/us-central1';
 const PRODUCTION_API_BASE = '-111834125610.us-central1.run.app';
 //https://scan-111834125610.us-central1.run.app
 //https://hello2-111834125610.us-central1.run.app

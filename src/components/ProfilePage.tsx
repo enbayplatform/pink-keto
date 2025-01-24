@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import Image from 'next/image';
-import ImageUpload from './ImageUpload';
+// import ImageUpload from './ImageUpload';
 
 interface UserProfile {
   name: string;
@@ -190,7 +190,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <ImageUpload />
+       
       </div>
     </div>
   );

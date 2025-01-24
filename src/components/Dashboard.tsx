@@ -13,26 +13,8 @@ import { handleFileChange, handleScan, handleRescan } from '@/lib/handlers';
 import { loadFirstPage, loadNextPage, loadPreviousPage, getSearchState, searchDocuments } from '@/lib/firebaseSearch';
 import { deleteDocument } from '@/lib/document';
 import { Document } from '../lib/document';
-
-// interface APIDocument {
-//   thumbnailUrl: string;
-//   text: string;
-//   status: string;
-//   createdAt: string;
-//   id: string;
-//   userId: string;
-// }
-
-// interface APIResponse {
-//   data: APIDocument[] | null;
-//   error: string | null;
-// }
-
-// interface UploadDataItem {
-//   fileId: string | number;
-//   original: File;
-//   thumbnail: File;
-// }
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -45,6 +27,8 @@ function Dashboard() {
   const [hasPrevious, setHasPrevious] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [remainingCredits, setRemainingCredits] = useState<number>(0);
+  const [isCheckingCredits, setIsCheckingCredits] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDocIndex, setSelectedDocIndex] = useState<number | null>(null);
   const [showTextPopup, setShowTextPopup] = useState(false);
@@ -139,18 +123,65 @@ function Dashboard() {
     fileInputRef.current?.click();
   };
 
-  const onFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    await handleFileChange(event.target.files, {
-      setIsUploading,
-      setError,
-      setSuccessMessage: (message: string) => setSuccessMessage(message),
-      fileInputRef,
-      loadFirstPage,
-      currentStatus,
-      setDocuments,
-      setHasMore,
-      setHasPrevious
-    });
+  const fetchRemainingCredits = async () => {
+    if (!user?.uid) return;
+    setIsCheckingCredits(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const total = (userData.freeCredits || 0) + 
+                     (userData.paidTier1Credits || 0) + 
+                     (userData.paidTier2Credits || 0);
+        setRemainingCredits(total);
+      }
+    } catch (error) {
+      console.error('Error fetching credits:', error);
+    } finally {
+      setIsCheckingCredits(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchRemainingCredits();
+    }
+  }, [user]);
+
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || !user) return;
+
+    // Check if user has enough credits for all files
+    if (files.length > remainingCredits) {
+      setError(`You can only upload ${remainingCredits} more image(s). Please upgrade your plan for more credits.`);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    try {
+      await handleFileChange(files, {
+        setIsUploading,
+        setError,
+        setSuccessMessage: (message: string) => setSuccessMessage(message),
+        fileInputRef,
+        loadFirstPage,
+        currentStatus,
+        setDocuments,
+        setHasMore,
+        setHasPrevious
+      });
+      // Refresh credits after successful upload
+      fetchRemainingCredits();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to upload files');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const onRefresh = async () => {
@@ -307,13 +338,37 @@ function Dashboard() {
     }
   };
 
+  // Add useEffect for initial document loading
+  useEffect(() => {
+    const loadInitialDocuments = async () => {
+      if (user) {
+        setIsLoading(true);
+        try {
+          const result = await loadFirstPage(currentStatus);
+          if (result.documents) {
+            setDocuments(result.documents);
+            setHasMore(result.hasMore);
+            setHasPrevious(result.hasPrevious);
+          }
+        } catch (err) {
+          setError('Failed to load documents');
+          console.error('Error loading documents:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadInitialDocuments();
+  }, [user, currentStatus]); // Reload when user or status changes
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Hidden file input */}
       <input
         type="file"
         ref={fileInputRef}
-        onChange={onFileChange}
+        onChange={handleFileInputChange}
         className="hidden"
         accept="image/*"
         multiple
@@ -338,9 +393,9 @@ function Dashboard() {
             )}
             <button
               onClick={handleUploadClick}
-              disabled={isUploading}
+              disabled={isUploading || remainingCredits === 0}
               className={`bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center space-x-1 ${
-                isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                isUploading || remainingCredits === 0 ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
               {isUploading ? (
@@ -366,6 +421,15 @@ function Dashboard() {
             >
               Refresh
             </button>
+            <div className="text-sm">
+              {isCheckingCredits ? (
+                <span>Loading credits...</span>
+              ) : (
+                <span className="font-medium">
+                  Remaining Credits: {remainingCredits}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </header>

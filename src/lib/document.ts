@@ -4,6 +4,7 @@ import { ref, deleteObject } from 'firebase/storage';
 
 export interface Document {
   id: string;
+  docid: string;
   thumbnailUrl: string;
   text: string;
   status: string;
