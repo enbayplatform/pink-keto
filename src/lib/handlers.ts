@@ -2,11 +2,12 @@ import { auth, db, storage } from '@/lib/firebase';
 import config from '@/config';
 import Compressor from 'compressorjs';
 import { fetchWithAuth } from './api';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { getFirestore, collection, addDoc, serverTimestamp, doc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { collection, addDoc, serverTimestamp, doc, deleteDoc, runTransaction } from 'firebase/firestore';
 import randomName from './utils'
 import { Document } from './document';
 import { checkUserCredits } from './credit';
+import { CSVSchema } from './csvschema';
 
 // Document collection and status constants
 export const DOCUMENT_COLLECTION = 'documents';
@@ -22,18 +23,19 @@ async function getNextDocumentId(): Promise<number> {
     throw new Error('User not authenticated');
   }
   const userId = user.uid;
+  // counter document id for easy management document
   const counterRef = doc(db, 'userCounters', userId);
-  
+
   const newCount = await runTransaction(db, async (transaction) => {
     const counterDoc = await transaction.get(counterRef);
     const currentCount = counterDoc.exists() ? counterDoc.data().count : 0;
     const nextCount = currentCount + 1;
-    
+
     transaction.set(counterRef, { count: nextCount }, { merge: true });
-    
+
     return nextCount;
   });
-  
+
   return newCount;
 }
 
@@ -99,7 +101,7 @@ export const handleFileChange = async (
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      
+
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
       if (!allowedTypes.includes(file.type)) {
@@ -145,7 +147,7 @@ export const handleFileChange = async (
       // Upload original file
       const originalRef = ref(storage, originalPath);
       const originalUploadTask = uploadBytesResumable(originalRef, originalFile);
-      
+
       // Upload thumbnail file
       const thumbnailRef = ref(storage, thumbnailPath);
       const thumbnailUploadTask = uploadBytesResumable(thumbnailRef, thumbnailFile);
@@ -258,11 +260,11 @@ export const handleRescan = async (documentId: string): Promise<void> => {
     const response = await fetchWithAuth(`${config.api.rescan}/${documentId}`, {
       method: 'POST'
     });
-    
+
     if (response.error) {
       throw new Error(response.error);
     }
-    
+
     return;
   } catch (error) {
     console.error('Error rescanning document:', error);
@@ -270,31 +272,141 @@ export const handleRescan = async (documentId: string): Promise<void> => {
   }
 };
 
-export const handleDelete = async (documentId: string, originalGS: string, thumbnailGS: string): Promise<void> => {
+export const deleteDocument = async (documentId: string, originalGS: string, thumbnailGS: string): Promise<void> => {
   try {
-    const storage = getStorage();
+    //const storage = getStorage();
     const user = auth.currentUser;
-    
+
     if (!user) {
       throw new Error('User not authenticated');
     }
 
     // Delete the original and thumbnail images from Storage
-    const originalRef = ref(storage, originalGS);
+    //const originalRef = ref(storage, originalGS);
     const thumbnailRef = ref(storage, thumbnailGS);
 
     await Promise.all([
-      deleteObject(originalRef),
+      //deleteObject(originalRef),
       deleteObject(thumbnailRef)
     ]);
 
     // Delete the document from Firestore
-    const firestore = getFirestore();
-    const docRef = doc(firestore, DOCUMENT_COLLECTION, documentId);
+    const docRef = doc(db, DOCUMENT_COLLECTION, documentId);
     await deleteDoc(docRef);
 
   } catch (error) {
     console.error('Error deleting document:', error);
     throw error;
+  }
+};
+
+export const detectSchemaWithAI = async (documentText: string): Promise<string> => {
+  try {
+    const response = await fetchWithAuth(config.api.airequest, {
+      method: 'POST',
+      // headers: {
+      //   'Content-Type': 'application/json',
+      // },
+      body: {
+        messages: [
+          {
+            role: "user",
+            content: `You are an expert assistant specializing in invoice data extraction and preparation for CSV export. Your primary goal is to identify and list **all common and relevant columns or fields**, just response output, keep origin language of document columns name, keep order of columns in document \n\n ${documentText}`
+          }
+        ]
+      }
+    });
+
+    if (response.error) {
+      throw new Error('Failed to detect schema');
+    }
+
+    const data = await response.data;
+    return data.message || '';
+  } catch (error) {
+    console.error('Error detecting schema:', error);
+    throw error;
+  }
+};
+
+export const handleExport = async (
+  documents: Document[],
+  schema: CSVSchema | null,
+  callbacks: {
+    setIsLoading: (loading: boolean) => void;
+    setError: (error: string | null) => void;
+    setSuccessMessage: (message: string | null) => void;
+  }
+) => {
+  const { setIsLoading, setError, setSuccessMessage } = callbacks;
+  try {
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    // Convert documents to CSV
+    const columns = schema?.columns||'';
+
+    // Prepare documents XML
+    const documentsXml = `<invoices>${documents.map(doc =>
+      `<invoice>${doc.text || ''}</invoice>`
+    ).join('')}</invoices>`;
+
+    // Call AI API for data extraction
+    const response = await fetchWithAuth(config.api.airequest, {
+      method: 'POST',
+      // headers: {
+      //   'Content-Type': 'application/json',
+      // },
+      body: {
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert in extracting data from invoices. Your task is to extract the following columns from invoices and return the data in CSV format: ${columns}`
+          },
+          {
+            role: "user",
+            content: documentsXml
+          }
+        ]
+      }
+    });
+
+    if (response.error) {
+      throw new Error('Failed to extract data from documents');
+    }
+
+    const csvData = await response.data;
+    if (!csvData.message) {
+      throw new Error('No data returned from AI');
+    }
+
+    // Create a blob with the CSV data
+    const blob = new Blob([csvData.message], { type: 'text/csv' });
+
+    // Create a URL for the blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary link element
+    const link = document.createElement('a');
+    link.href = url;
+    const filename = `${schema?.name}-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = filename;
+
+    // Trigger the download
+    document.body.appendChild(link);
+    link.click();
+
+    // Clean up
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setSuccessMessage?.('Documents exported successfully');
+    setTimeout(() => setSuccessMessage?.(null), 3000);
+  } catch (error) {
+    console.error('Error exporting documents:', error);
+    setError?.(error instanceof Error ? error.message : 'An error occurred while exporting documents');
+  } finally {
+    setIsLoading?.(false);
   }
 };

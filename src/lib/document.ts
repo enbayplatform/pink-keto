@@ -3,6 +3,7 @@ import { doc, deleteDoc, getDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 
 export interface Document {
+  docId: number;
   id: string;
   docid: string;
   thumbnailUrl: string;
@@ -29,10 +30,10 @@ export async function deleteDocument(documentId: string): Promise<void> {
 
     // Get the document reference
     const docRef = doc(db, 'documents', documentId);
-    
+
     // First get the document to get the file paths
     const docSnap = await getDoc(docRef);
-    
+
     if (!docSnap.exists()) {
       throw new Error('Document not found');
     }

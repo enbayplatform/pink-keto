@@ -7,19 +7,20 @@ import { fetchWithAuth } from '@/lib/api';
 import config from '@/config';
 import Compressor from 'compressorjs';
 import StatusFilter from './StatusFilter';
+import SchemaModal from './SchemaModal';
 import { Timestamp } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
-import { handleFileChange, handleScan, handleRescan } from '@/lib/handlers';
+import { handleFileChange, handleScan, deleteDocument, handleExport } from '@/lib/handlers';
 import { loadFirstPage, loadNextPage, loadPreviousPage, getSearchState, searchDocuments } from '@/lib/firebaseSearch';
-import { deleteDocument } from '@/lib/document';
-import { Document } from '../lib/document';
-import { doc, getDoc } from 'firebase/firestore';
+import { Document as CustomDocument } from '../lib/document';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { CSVSchema } from '../lib/csvschema';
 
 function Dashboard() {
   const { user } = useAuth();
   const [currentStatus, setCurrentStatus] = useState('all');
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<CustomDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -29,9 +30,11 @@ function Dashboard() {
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [remainingCredits, setRemainingCredits] = useState<number>(0);
   const [isCheckingCredits, setIsCheckingCredits] = useState(false);
+  const [showSchemaModal, setShowSchemaModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDocIndex, setSelectedDocIndex] = useState<number | null>(null);
   const [showTextPopup, setShowTextPopup] = useState(false);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -131,13 +134,31 @@ function Dashboard() {
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        const total = (userData.freeCredits || 0) + 
-                     (userData.paidTier1Credits || 0) + 
+        const total = (userData.freeCredits || 0) +
+                     (userData.paidTier1Credits || 0) +
                      (userData.paidTier2Credits || 0);
         setRemainingCredits(total);
+      } else {
+        // Create new user profile
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const user_profile_data = {
+          uid: user.uid,
+          email: user.email || "",
+          displayName: user.displayName || "",
+          createdAt: serverTimestamp(),
+          freeCredits: 30,
+          freeCreditsResetDate: firstDayOfMonth,
+          paidTier1Credits: 0,
+          paidTier2Credits: 0,
+        };
+
+        await setDoc(userRef, user_profile_data);
+        setRemainingCredits(30); // Set initial free credits
       }
     } catch (error) {
-      console.error('Error fetching credits:', error);
+      console.error('Error fetching/creating credits:', error);
     } finally {
       setIsCheckingCredits(false);
     }
@@ -226,7 +247,7 @@ function Dashboard() {
       await new Promise<void>((resolve, reject) => {
         xhr.open('POST', config.api.upload);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        
+
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
@@ -234,7 +255,7 @@ function Dashboard() {
             reject(new Error(`Upload failed: ${xhr.statusText}`));
           }
         };
-        
+
         xhr.onerror = () => reject(new Error('Network error during upload'));
         xhr.send(formData);
       });
@@ -245,73 +266,78 @@ function Dashboard() {
   };
 
   // Calculate total upload progress
-  const totalProgress = Object.values(uploadProgress).reduce((sum, progress) => sum + progress, 0) / 
+  const totalProgress = Object.values(uploadProgress).reduce((sum, progress) => sum + progress, 0) /
     (Object.keys(uploadProgress).length || 1);
 
   const formatDate = (date: any) => {
     try {
       if (!date) return 'N/A';
-      
+
+      let dateObj: Date;
+
       // Handle Firebase Timestamp object
       if (date instanceof Timestamp) {
-        return date.toDate().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
+        dateObj = date.toDate();
       }
-      
       // Handle Firebase server timestamp (from document)
-      if (date.seconds && date.nanoseconds) {
+      else if (date.seconds && date.nanoseconds) {
         const timestamp = new Timestamp(date.seconds, date.nanoseconds);
-        return timestamp.toDate().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
+        dateObj = timestamp.toDate();
       }
-      
       // Handle regular date string/object
-      const dateObj = new Date(date);
-      if (isNaN(dateObj.getTime())) {
-        return 'Invalid Date';
+      else {
+        dateObj = new Date(date);
+        if (isNaN(dateObj.getTime())) {
+          return 'Invalid Date';
+        }
       }
-      
-      return dateObj.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+
+      const now = new Date();
+      const diffMs = now.getTime() - dateObj.getTime();
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      const diffMonths = Math.floor(diffDays / 30);
+      const diffYears = Math.floor(diffDays / 365);
+
+      if (diffSecs < 60) {
+        return 'just now';
+      } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+      } else if (diffDays < 30) {
+        return `${diffDays}d ago`;
+      } else if (diffMonths < 12) {
+        return `${diffMonths}m ago`;
+      } else {
+        return `${diffYears}y ago`;
+      }
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid Date';
     }
   };
 
-  const handleDelete = async (documentId: string) => {
+  const handleDelete = async (doc: CustomDocument) => {
     // Show confirmation dialog
     const confirmDelete = window.confirm('Are you sure you want to delete this document?');
-    
+
     if (!confirmDelete) {
       return; // User cancelled deletion
     }
 
     try {
       setIsLoading(true);
-      await deleteDocument(documentId);
-      
+      await deleteDocument(doc.id, doc.originalGS, doc.thumbnailGS);
+
       // Refresh the documents list after deletion
       const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
       setDocuments(result.documents);
       setHasMore(result.hasMore);
       setHasPrevious(result.hasPrevious);
-      
+
       setSuccessMessage('Document deleted successfully');
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to delete document');
@@ -320,22 +346,36 @@ function Dashboard() {
     }
   };
 
-  const handleRescanDocument = async (documentId: string) => {
-    try {
-      setIsLoading(true);
-      await handleRescan(documentId);
-      setSuccessMessage('Document rescan initiated successfully');
-      
-      // Refresh the documents list to show updated status
-      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
-      setDocuments(result.documents);
-      setHasMore(result.hasMore);
-      setHasPrevious(result.hasPrevious);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to rescan document');
-    } finally {
-      setIsLoading(false);
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedDocumentIds(documents.map(doc => doc.id));
+    } else {
+      setSelectedDocumentIds([]);
     }
+  };
+
+  const handleSelectDocument = (id: string) => {
+    setSelectedDocumentIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(docId => docId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleExportClick = () => {
+    setShowSchemaModal(true);
+  };
+
+  const handleSchemaExport = (schema: CSVSchema | null) => {
+    const selectedDocs = documents.filter(doc => selectedDocumentIds.includes(doc.id));
+    handleExport(selectedDocs, schema, {
+      setIsLoading,
+      setError,
+      setSuccessMessage
+    });
+    setShowSchemaModal(false);
   };
 
   // Add useEffect for initial document loading
@@ -421,15 +461,19 @@ function Dashboard() {
             >
               Refresh
             </button>
-            <div className="text-sm">
-              {isCheckingCredits ? (
-                <span>Loading credits...</span>
-              ) : (
-                <span className="font-medium">
-                  Remaining Credits: {remainingCredits}
-                </span>
-              )}
-            </div>
+            <button
+              onClick={handleExportClick}
+              disabled={selectedDocumentIds.length === 0}
+              className={`bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 ml-2 flex items-center space-x-1 ${
+                selectedDocumentIds.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 013 3h10a3 3 0 013-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Export</span>
+            </button>
+
           </div>
         </div>
       </header>
@@ -470,8 +514,17 @@ function Dashboard() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                           <tr>
+
                             <th scope="col" className="px-4 py-3 bg-gray-50">
-                              <input type="checkbox" className="rounded" />
+                            <input
+                                type="checkbox"
+                                className="rounded"
+                                checked={documents.length > 0 && selectedDocumentIds.length === documents.length}
+                                onChange={handleSelectAll}
+                              />
+                            </th>
+                            <th scope="col" className="px-4 py-3 bg-gray-50">
+                              Id
                             </th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Thumbnail</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Date</th>
@@ -483,9 +536,16 @@ function Dashboard() {
                         <tbody className="bg-white divide-y divide-gray-200">
                           {documents.map((doc, index) => (
                             <tr key={doc.id} className="hover:bg-gray-50">
+
                               <td className="px-4 py-3">
-                                <input type="checkbox" className="rounded" />
+                                <input
+                                  type="checkbox"
+                                  className="rounded"
+                                  checked={selectedDocumentIds.includes(doc.id)}
+                                  onChange={() => handleSelectDocument(doc.id)}
+                                />
                               </td>
+                              <td className="px-4 py-3">{doc.docId}</td>
                               <td className="px-4 py-3">
                                 <div className="relative w-16 h-16">
                                   <Image
@@ -502,7 +562,7 @@ function Dashboard() {
                                 {formatDate(doc.createdAt)}
                               </td>
                               <td className="px-4 py-3">
-                                <p 
+                                <p
                                   className="text-sm text-gray-900 line-clamp-2 cursor-pointer hover:text-blue-600"
                                   onClick={() => handleTextClick(index)}
                                 >
@@ -528,23 +588,13 @@ function Dashboard() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex space-x-2">
-                                  <button 
-                                    className="p-1 hover:bg-gray-100 rounded" 
-                                    title="Re-scan"
-                                    onClick={() => handleRescanDocument(doc.id)}
-                                    disabled={isLoading}
-                                  >
-                                    <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                  </button>
-                                  <button 
-                                    className="p-1 hover:bg-gray-100 rounded" 
+                                  <button
+                                    className="p-1 hover:bg-gray-100 rounded"
                                     title="Delete"
-                                    onClick={() => handleDelete(doc.id)}
+                                    onClick={() => handleDelete(doc)}
                                     disabled={isLoading}
                                   >
-                                    <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                   </button>
@@ -572,17 +622,17 @@ function Dashboard() {
                       : 'text-gray-400 bg-gray-100 cursor-not-allowed border border-gray-200'
                   }`}
                 >
-                  <svg 
-                    className="mr-2 h-5 w-5" 
-                    fill="none" 
-                    stroke="currentColor" 
+                  <svg
+                    className="mr-2 h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M15 19l-7-7 7-7" 
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
                     />
                   </svg>
                   Previous
@@ -608,17 +658,17 @@ function Dashboard() {
                   }`}
                 >
                   Next
-                  <svg 
-                    className="ml-2 h-5 w-5" 
-                    fill="none" 
-                    stroke="currentColor" 
+                  <svg
+                    className="ml-2 h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M9 5l7 7-7 7" 
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
                     />
                   </svg>
                 </button>
@@ -632,7 +682,7 @@ function Dashboard() {
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900">No documents found</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {currentStatus === 'all' 
+              {currentStatus === 'all'
                 ? 'No documents available.'
                 : `No documents with status "${currentStatus}" found.`}
             </p>
@@ -688,6 +738,14 @@ function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Schema Modal */}
+      <SchemaModal
+        isOpen={showSchemaModal}
+        onClose={() => setShowSchemaModal(false)}
+        onExport={handleSchemaExport}
+        selectedDocuments={documents.filter((doc: CustomDocument) => selectedDocumentIds.includes(doc.id))}
+      />
     </div>
   );
 }
