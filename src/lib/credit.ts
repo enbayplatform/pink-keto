@@ -9,9 +9,9 @@ export class InsufficientCreditsError extends Error {
 }
 
 export interface UserCredits {
-  freeCredits: number;
-  paidTier1Credits: number;
-  paidTier2Credits: number;
+  free: number;
+  onetime: number;
+  monthly: number;
   createdAt: Date;
 }
 
@@ -27,20 +27,20 @@ export async function checkUserCredits(userId: string): Promise<boolean> {
     if (!userSnap.exists()) {
       // Initialize user document with default credits
       await setDoc(userRef, {
-        freeCredits: 50, // Give 3 free credits to start
-        paidTier1Credits: 0,
-        paidTier2Credits: 0,
+        free: 50, // Give 3 free credits to start
+        onetime: 0,
+        monthly: 0,
         createdAt: new Date()
       });
       return true; // User has free credits after initialization
     }
 
     const userData = userSnap.data();
-    const freeCredits = userData?.freeCredits ?? 0;
-    const paidTier1Credits = userData?.paidTier1Credits ?? 0;
-    const paidTier2Credits = userData?.paidTier2Credits ?? 0;
+    const free = userData?.free ?? 0;
+    const onetime = userData?.onetime ?? 0;
+    const monthly = userData?.monthly ?? 0;
 
-    return freeCredits > 0 || paidTier1Credits > 0 || paidTier2Credits > 0;
+    return free > 0 || onetime > 0 || monthly;
   } catch (error) {
     console.error('Error checking user credits:', error);
     if (error instanceof Error) {
@@ -62,9 +62,9 @@ export async function getUserCredits(userId: string): Promise<UserCredits> {
     if (!userSnap.exists()) {
       // Initialize user document with default credits
       const defaultCredits: UserCredits = {
-        freeCredits: 50,
-        paidTier1Credits: 0,
-        paidTier2Credits: 0,
+        free: 50,
+        onetime: 0,
+        monthly: 0,
         createdAt: new Date()
       };
       await setDoc(userRef, defaultCredits);
@@ -73,9 +73,9 @@ export async function getUserCredits(userId: string): Promise<UserCredits> {
 
     const userData = userSnap.data();
     return {
-      freeCredits: userData.freeCredits ?? 0,
-      paidTier1Credits: userData.paidTier1Credits ?? 0,
-      paidTier2Credits: userData.paidTier2Credits ?? 0,
+      free: userData.free ?? 0,
+      onetime: userData.onetime ?? 0,
+      monthly: userData.monthly ?? 0,
       createdAt: userData.createdAt.toDate()
     };
   } catch (error) {

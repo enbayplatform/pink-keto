@@ -134,9 +134,9 @@ function Dashboard() {
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        const total = (userData.freeCredits || 0) +
-                     (userData.paidTier1Credits || 0) +
-                     (userData.paidTier2Credits || 0);
+        const total = (userData.free || 0) +
+                     (userData.onetime || 0) +
+                     (userData.monthly || 0);
         setRemainingCredits(total);
       } else {
         // Create new user profile
@@ -148,14 +148,14 @@ function Dashboard() {
           email: user.email || "",
           displayName: user.displayName || "",
           createdAt: serverTimestamp(),
-          freeCredits: 30,
+          free: 50,
           freeCreditsResetDate: firstDayOfMonth,
-          paidTier1Credits: 0,
-          paidTier2Credits: 0,
+          onetime: 0,
+          monthly: 0,
         };
 
         await setDoc(userRef, user_profile_data);
-        setRemainingCredits(30); // Set initial free credits
+        setRemainingCredits(50); // Set initial free credits
       }
     } catch (error) {
       console.error('Error fetching/creating credits:', error);

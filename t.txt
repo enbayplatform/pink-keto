@@ -14,3 +14,19 @@
 },
 "createTime":"2024-12-30T06:57:47.905468Z",
 "updateTime":"2024-12-30T06:57:47.905468Z"},"targetIds":[8]}}]],
+
+-- ?? vpnbankcode nhưng không thấy số tk ?
+https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html
+vnp_BankCode: Giá trị này tùy chọn.
+- Nếu loại bỏ tham số không gửi sang, khách hàng sẽ chọn phương thức thanh toán, ngân hàng thanh toán tại VNPAY.
+- Nếu thiết lập giá trị (chọn Ngân hàng thanh toán tại Website-ứng dụng TMĐT), Tham khảo bảng mã trả về tại API:
+Endpoint: https://sandbox.vnpayment.vn/qrpayauth/api/merchant/get_bank_list
+Http method: POST
+Content-Type: application/x-www-form-urlencoded
+key tmn_code
+value Theo mã định danh kết nối (vnp_TmnCode) VNPAY cung cấp
+
+$ curl -X POST \
+  'https://sandbox.vnpayment.vn/qrpayauth/api/merchant/get_bank_list' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'tmn_code=EC9AQ2NM'
