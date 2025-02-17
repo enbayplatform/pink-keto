@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import Image from 'next/image';
+import Image from 'nextimage';
 // import ImageUpload from './ImageUpload';
 
 interface UserProfile {
@@ -32,19 +32,20 @@ export default function ProfilePage() {
         try {
           const userRef = doc(db, 'users', user.uid);
           const userSnap = await getDoc(userRef);
-
-          if (userSnap.exists()) {
-            const userData = userSnap.data() as UserProfile;
-            setProfile(userData);
-            setEditedProfile(userData);
-          } else {
-            // Create initial profile
-            const initialProfile = {
+const initialProfile = {
               name: user.displayName || '',
               email: user.email || '',
               photoURL: user.photoURL || '/default-avatar.png',
               bio: '',
             };
+          if (userSnap.exists()) {
+            const userData = userSnap.data() as UserProfile;
+            const userData = userSnap.data() as UserProfile;
+          setProfile(userData);
+            setEditedProfile(userData);
+          } else {
+            // Create initial profile
+
             await setDoc(userRef, initialProfile);
             setProfile(initialProfile);
             setEditedProfile(initialProfile);
@@ -190,7 +191,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-       
+
       </div>
     </div>
   );

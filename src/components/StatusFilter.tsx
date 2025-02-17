@@ -13,10 +13,7 @@ export default function StatusFilter({ onStatusChange, currentStatus }: StatusFi
 
   const statuses = [
     { value: 'all', label: 'All Documents', color: 'gray' },
-    { value: 'init', label: 'Initialized', color: 'blue' },
-    { value: 'pending', label: 'Pending', color: 'yellow' },
-    { value: 'processing', label: 'Processing', color: 'orange' },
-    { value: 'completed', label: 'Completed', color: 'green' }
+    { value: 'unfinish', label: 'Unfinish', color: 'orange' }
   ];
 
   useEffect(() => {
@@ -37,14 +34,8 @@ export default function StatusFilter({ onStatusChange, currentStatus }: StatusFi
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'init':
-        return 'bg-blue-100 text-blue-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'processing':
+      case 'unfinish':
         return 'bg-orange-100 text-orange-800';
-      case 'completed':
-        return 'bg-green-100 text-green-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }

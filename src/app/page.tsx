@@ -9,10 +9,10 @@ export default function Home() {
       <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <span className="text-2xl font-bold text-pink-600">Pink Keto</span>
+            <span className="text-2xl font-bold text-pink-600">Pink Scan AI</span>
           </div>
           <div className="flex items-center space-x-4">
-            <Link 
+            <Link
               href="/login"
               className="px-6 py-2 text-pink-600 hover:text-pink-700 font-medium"
             >
@@ -215,7 +215,7 @@ export default function Home() {
         <div className="container mx-auto px-6">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <h3 className="text-lg font-semibold mb-4">Pink Keto</h3>
+              <h3 className="text-lg font-semibold mb-4">Pink Scan AI</h3>
               <p className="text-gray-600">
                 AI-powered document scanning and text extraction solution.
               </p>
@@ -248,7 +248,7 @@ export default function Home() {
           <div className="border-t border-gray-200 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="text-gray-600 mb-4 md:mb-0">
-                &copy; 2024 Pink Keto. All rights reserved.
+                &copy; 2025 Pink Scan AI. All rights reserved.
               </div>
               <div className="flex space-x-6">
                 <a href="#" className="text-gray-600 hover:text-pink-600">Terms</a>

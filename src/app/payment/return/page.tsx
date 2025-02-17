@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/lib/api';
+import config from '@/config';
 
 interface PaymentResult {
   isValid: boolean;
@@ -12,10 +14,30 @@ interface PaymentResult {
   amount: number;
   payDate: string;
   transactionNo: string;
-  bankCode: string;
+  ref: string;
 }
 
-export default function PaymentReturnPage() {
+function sortObject(obj: Record<string, any>) {
+  const sorted: Record<string, any> = {};
+  const str: string[] = [];
+  let key: string;
+
+  for (key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      str.push(key);
+    }
+  }
+  str.sort();
+
+  for (let i = 0; i < str.length; i++) {
+    key = str[i];
+    sorted[key] = encodeURIComponent(obj[key]).replace(/%20/g, '+');
+  }
+  return sorted;
+}
+
+// Client Component
+function PaymentReturn() {
   const searchParams = useSearchParams();
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,12 +46,50 @@ export default function PaymentReturnPage() {
   useEffect(() => {
     const verifyPayment = async () => {
       try {
-        const response = await fetch(`/api/payment/vnpay-return${window.location.search}`);
+        // Get all params from URL
+        const params: Record<string, any> = {};
+        searchParams.forEach((value, key) => {
+          params[key] = value;
+        });
+
+        const secureHash = params['vnp_SecureHash'];
+        const responseCode = params['vnp_ResponseCode'];
+
+        // Remove hash params
+        delete params['vnp_SecureHash'];
+        delete params['vnp_SecureHashType'];
+
+        // Sort params
+        const sortedParams = sortObject(params);
+
+        // Get signature from API
+        const response = await fetch(config.api.vnpaysign, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+          body: JSON.stringify(sortedParams)
+        });
+
         if (!response.ok) {
-          throw new Error('Failed to verify payment');
+          throw new Error('Failed to verify signature');
         }
-        const data = await response.json();
-        setResult(data);
+        const { sign: signedHash } = await response.json();
+
+        // Verify signature
+        const isValidSignature = secureHash === signedHash;
+        const isSuccessful = responseCode === '00';
+
+        setResult({
+          isValid: isValidSignature,
+          isSuccessful,
+          responseCode,
+          orderInfo: params['vnp_OrderInfo'],
+          amount: Number(params['vnp_Amount']) / 100,
+          payDate: params['vnp_PayDate'],
+          transactionNo: params['vnp_TransactionNo'],
+          ref: params['vnp_TxnRef']
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Something went wrong');
       } finally {
@@ -57,7 +117,7 @@ export default function PaymentReturnPage() {
         <div className="text-center">
           <div className="text-red-500 text-xl mb-4">❌ Error</div>
           <p className="text-gray-600">{error}</p>
-          <Link href="/" className="mt-4 inline-block text-pink-500 hover:text-pink-600">
+          <Link href="/dashboard" className="mt-4 inline-block text-pink-500 hover:text-pink-600">
             Return to Home
           </Link>
         </div>
@@ -123,8 +183,8 @@ export default function PaymentReturnPage() {
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <dt className="text-sm font-medium text-gray-500">Bank</dt>
-                <dd className="text-sm text-gray-900 col-span-2">{result.bankCode}</dd>
+                <dt className="text-sm font-medium text-gray-500">Ref</dt>
+                <dd className="text-sm text-gray-900 col-span-2">{result.ref}</dd>
               </div>
             </dl>
           </div>
@@ -132,7 +192,7 @@ export default function PaymentReturnPage() {
 
         <div className="mt-8 text-center">
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500"
           >
             Return to Home
@@ -140,5 +200,14 @@ export default function PaymentReturnPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Page Component
+export default function PaymentReturnPage() {
+  return (
+    <Suspense fallback={<div>Loading payment verification...</div>}>
+      <PaymentReturn />
+    </Suspense>
   );
 }

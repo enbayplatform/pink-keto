@@ -1,0 +1,7 @@
+User-Agent: *
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /payment/
+
+Sitemap: https://pinkscanai.com/sitemap.xml

@@ -68,7 +68,11 @@ export async function searchDocuments(
 
         // Add status filter if specified
         if (status && status !== 'all') {
-            q = query(q, where('status', '==', status));
+            if (status === 'unfinish') {
+                q = query(q, where('status', '!=', 'complete'));
+            } else {
+                q = query(q, where('status', '==', status));
+            }
         }
 
         // Add pagination
@@ -80,12 +84,6 @@ export async function searchDocuments(
         } else if (direction === 'back' && searchState.firstVisibleDocument) {
             q = query(q, endBefore(searchState.firstVisibleDocument));
         }
-
-        // let q1 = query(
-        //     collection(db, 'documents'),
-        //     where('userId', '==', user.uid),
-        //     orderBy('createdAt', 'desc')
-        // );
 
         const querySnapshot = await getDocs(q);
         const results: any[] = [];

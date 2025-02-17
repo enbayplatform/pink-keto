@@ -5,6 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { getUserCredits, type UserCredits } from '@/lib/credit';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { fetchWithAuth } from '@/lib/api';
+import config from '@/config';
 
 interface PricingPlan {
   id: string;
@@ -28,7 +30,8 @@ const plans: PricingPlan[] = [
     title: 'One-Time',
     price: 4.99,
     priceVND: 120000,
-    features: ['Free tier', '1000 credits', 'Lifetime access', 'Priority support']
+    features: ['Free tier', '1000 credits', 'Lifetime access', 'Priority support'],
+    disabled: true
   },
   {
     id: 'monthly',
@@ -83,23 +86,21 @@ export default function ProfilePage() {
 
     try {
       setPaymentLoading(plan.id);
-      const response = await fetch('/api/payment?fn=createpayment', {
+      const response = await fetchWithAuth(config.api.createpayment, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        // headers: {
+        //   'Content-Type': 'application/json',
+        // },
+        body: {
           amount: plan.priceVND,
           planId: plan.id,
           userId: user?.uid,
           orderInfo: plan.id +'-'+ user?.uid+'-'+ plan.priceVND,
-          //orderType: plan.id,
-          //language: 'vn',
-          //paymentMethod: 'vnpay'
-        }),
+        },
       });
 
-      const data = await response.json();
+      // const data = await response.json();
+      const data = await response.data;
       if (data.url) {
         window.location.href = data.url;
       } else {
@@ -127,6 +128,25 @@ export default function ProfilePage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <button
+        onClick={() => router.push('/dashboard')}
+        className="mb-6 inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+      >
+        <svg
+          className="w-5 h-5 mr-2"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+          />
+        </svg>
+        Back to Dashboard
+      </button>
       <h1 className="text-3xl font-bold mb-8">Profile</h1>
       <div className="bg-white rounded-lg shadow p-6 space-y-8">
         <div className="flex items-center space-x-4">

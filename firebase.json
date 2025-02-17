@@ -8,7 +8,14 @@
     ],
     "frameworksBackend": {
       "region": "asia-east1"
-    }
+    },
+    "redirects": [
+      {
+        "source": "https://www.pinkscanai.com/:path*",
+        "destination": "https://pinkscanai.com/:path*",
+        "type": 301
+      }
+    ]
   },
   "storage": {
     "rules": "storage.rules"

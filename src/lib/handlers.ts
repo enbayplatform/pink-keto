@@ -257,7 +257,7 @@ export const handleScan = async (documentId: string) => {
 // @throws Error if the rescan fails
 export const handleRescan = async (documentId: string): Promise<void> => {
   try {
-    const response = await fetchWithAuth(`${config.api.rescan}/${documentId}`, {
+    const response = await fetchWithAuth(`${config.api.createpayment}/${documentId}`, {
       method: 'POST'
     });
 

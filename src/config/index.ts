@@ -1,9 +1,9 @@
 interface Config {
   api: {
-    upload: string;
+    vnpaysign: string;
     scan: string;
     hello: string;
-    rescan: string;
+    createpayment: string;
     airequest: string;
   };
 }
@@ -29,9 +29,9 @@ const PRODUCTION_API_BASE = 'asia-east1-boringketo.cloudfunctions.net';
 const config: Config = {
   api: {
     hello: !USE_PRODUCTION ? `${LOCAL_API_BASE}/hello2` : `https://hello2${PRODUCTION_API_BASE}/hello2`,
-    upload: !USE_PRODUCTION ? `${LOCAL_API_BASE}/upload` : `https://upload${PRODUCTION_API_BASE}/upload`,
+    vnpaysign: !USE_PRODUCTION ? `${LOCAL_API_BASE}/vnpaysign` : `https://upload${PRODUCTION_API_BASE}/vnpaysign`,
     scan: !USE_PRODUCTION ? `${LOCAL_API_BASE}/scan` : `https://${PRODUCTION_API_BASE}/scan`,
-    rescan: !USE_PRODUCTION ? `${LOCAL_API_BASE}/rescan` : `https://${PRODUCTION_API_BASE}/rescan`,
+    createpayment: !USE_PRODUCTION ? `${LOCAL_API_BASE}/createpayment` : `https://${PRODUCTION_API_BASE}/createpayment`,
     airequest: !USE_PRODUCTION ? `${LOCAL_API_BASE}/airequest` : `https://${PRODUCTION_API_BASE}/airequest`
   },
 };

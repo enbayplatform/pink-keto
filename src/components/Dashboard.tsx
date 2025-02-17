@@ -35,6 +35,7 @@ function Dashboard() {
   const [selectedDocIndex, setSelectedDocIndex] = useState<number | null>(null);
   const [showTextPopup, setShowTextPopup] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -245,7 +246,7 @@ function Dashboard() {
       });
 
       await new Promise<void>((resolve, reject) => {
-        xhr.open('POST', config.api.upload);
+        xhr.open('POST', config.api.vnpaysign);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
         xhr.onload = () => {
@@ -378,6 +379,47 @@ function Dashboard() {
     setShowSchemaModal(false);
   };
 
+  const handleDeleteSelected = async () => {
+    if (selectedDocumentIds.length === 0) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Delete each selected document
+      for (const docId of selectedDocumentIds) {
+        const doc = documents.find(d => d.id === docId);
+        if (doc) {
+          await deleteDocument(doc.id, doc.originalGS, doc.thumbnailGS);
+        }
+      }
+      
+      // Clear selection
+      setSelectedDocumentIds([]);
+      
+      // Refresh the document list
+      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
+      setDocuments(result.documents);
+      setHasMore(result.hasMore);
+      setHasPrevious(result.hasPrevious);
+      
+      setSuccessMessage('Selected documents deleted successfully');
+    } catch (error) {
+      console.error('Error deleting documents:', error);
+      setError('Failed to delete selected documents');
+    } finally {
+      setIsLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+  };
+
   // Add useEffect for initial document loading
   useEffect(() => {
     const loadInitialDocuments = async () => {
@@ -473,7 +515,18 @@ function Dashboard() {
               </svg>
               <span>Export</span>
             </button>
-
+            <button
+              onClick={handleDeleteSelected}
+              disabled={selectedDocumentIds.length === 0}
+              className={`bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 ml-2 flex items-center space-x-1 ${
+                selectedDocumentIds.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Delete</span>
+            </button>
           </div>
         </div>
       </header>
@@ -678,7 +731,7 @@ function Dashboard() {
         ) : (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16c.452-1.162 1.158-2.507 2.246-3.172l1.414 1.414 1.414-1.414c1.088 1.664 2.794 2.99 4.622 3.172.558.104 1.038.176 1.542.176.504 0 1.024-.092 1.542-.176 1.828-1.182 3.534-1.508 4.622-3.172l1.414-1.414-1.414-1.414c-1.088-1.664-2.794-2.99-4.622-3.172-.558-.104-1.038-.176-1.542-.176-.504 0-1.024.092-1.542.176-1.828 1.182-3.534 1.508-4.622 3.172l-1.414 1.414-1.414-1.414zM10 11a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900">No documents found</h3>
             <p className="mt-1 text-sm text-gray-500">
@@ -727,12 +780,77 @@ function Dashboard() {
 
               {/* Right side - Extracted Text */}
               <div className="w-1/2 p-4">
-                <h4 className="font-medium mb-2">Extracted Text:</h4>
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-medium">Extracted Text:</h4>
+                  <div className="flex items-center gap-2">
+                    <div className="group relative">
+                      <button
+                        className="text-gray-400 hover:text-gray-600"
+                        aria-label="Paste instructions"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="absolute bottom-full right-0 mb-2 w-64 bg-black text-white text-sm rounded-lg py-2 px-3 invisible group-hover:visible shadow-lg">
+                          Paste (Ctrl+V) to Excel/Google Sheet. If table format is incorrect, try Ctrl+Shift+V for plain text paste.
+                          <div className="absolute bottom-0 right-4 transform translate-y-1/2 rotate-45 w-2 h-2 bg-black"></div>
+                        </div>
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const text = documents[selectedDocIndex].text || '';
+                        navigator.clipboard.writeText(text);
+                      }}
+                      className="inline-flex items-center px-3 py-1 text-sm text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-md"
+                    >
+                      <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      Copy
+                    </button>
+                  </div>
+                </div>
                 <div className="h-[calc(100%-2rem)] overflow-y-auto">
                   <div className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap">
                     {documents[selectedDocIndex].text || 'No text extracted yet'}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mt-4">Confirm Delete</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete {selectedDocumentIds.length} document{selectedDocumentIds.length > 1 ? 's' : ''}?
+                </p>
+              </div>
+              <div className="flex justify-center gap-4 mt-4">
+                <button
+                  onClick={handleCancelDelete}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                >
+                  No
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Yes
+                </button>
               </div>
             </div>
           </div>
