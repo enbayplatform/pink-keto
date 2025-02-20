@@ -15,7 +15,10 @@
         "destination": "https://pinkscanai.com/:path*",
         "type": 301
       }
-    ]
+    ],
+    "customDomain": {
+      "domain": "pinkscanai.com"
+    }
   },
   "storage": {
     "rules": "storage.rules"

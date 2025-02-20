@@ -57,10 +57,12 @@ export default function Home() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-pink-400 to-purple-500 rounded-lg transform rotate-6 scale-105 opacity-20"></div>
               <div className="relative bg-white p-6 rounded-lg shadow-xl">
-                <div className="aspect-w-16 aspect-h-9 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-full h-full text-gray-300" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M4 4v16h16V4H4zm2 2h12v12H6V6zm2 2v8h8V8H8zm1 1h6v6H9V9z"/>
-                  </svg>
+                <div className="aspect-w-16 aspect-h-9 bg-gray-100 rounded-lg overflow-hidden">
+                  <img
+                    src="/hero.webp"
+                    alt="Document scanning illustration"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </div>
             </div>
@@ -90,9 +92,10 @@ export default function Home() {
       {/* Features Section */}
       <section id="features" className="bg-white py-16 md:py-24">
         <div className="container mx-auto px-6">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-8">
             Powerful Features for Your Documents
           </h2>
+
           <div className="grid md:grid-cols-3 gap-12">
             {[
               {
@@ -118,6 +121,20 @@ export default function Home() {
               </div>
             ))}
           </div>
+          <div className="mb-16 gap-12" >
+            <div className="max-w-4xl mx-auto relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-pink-400 to-purple-500 rounded-xl transform rotate-6 scale-105 opacity-20"></div>
+              <div className="relative">
+                <div className="aspect-w-16 aspect-h-9 rounded-xl overflow-hidden shadow-xl">
+                  <img
+                    src="/pinkscandocs.webp"
+                    alt="Pink Scan AI document features showcase"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -131,8 +148,8 @@ export default function Home() {
             {[
               { step: '1', title: 'Upload', description: 'Upload any document or image containing text' },
               { step: '2', title: 'Process', description: 'Our AI analyzes and extracts text automatically' },
-              { step: '3', title: 'Review', description: 'Review and edit the extracted text if needed' },
-              { step: '4', title: 'Download', description: 'Download or share your searchable document' },
+              { step: '3', title: 'Export', description: 'Choose what columns you want to get' },
+              { step: '4', title: 'Download', description: 'Download CSV file' },
             ].map((step, index) => (
               <div key={index} className="relative">
                 <div className="bg-white rounded-lg p-6 text-center relative z-10">
@@ -147,6 +164,18 @@ export default function Home() {
                 )}
               </div>
             ))}
+          </div>
+          <div className="mt-16 max-w-4xl mx-auto relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-pink-400 to-purple-500 rounded-xl transform rotate-6 scale-105 opacity-20"></div>
+            <div className="relative">
+              <div className="aspect-w-16 aspect-h-9 rounded-xl overflow-hidden shadow-xl">
+                <img
+                  src="/pinkscan-export-csv.webp"
+                  alt="Pink Scan AI export to CSV feature"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>

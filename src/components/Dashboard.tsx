@@ -498,12 +498,6 @@ function Dashboard() {
               )}
             </button>
             <button
-              onClick={onRefresh}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 ml-2"
-            >
-              Refresh
-            </button>
-            <button
               onClick={handleExportClick}
               disabled={selectedDocumentIds.length === 0}
               className={`bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 ml-2 flex items-center space-x-1 ${
@@ -582,7 +576,18 @@ function Dashboard() {
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Thumbnail</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Date</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Text</th>
-                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Status</th>
+                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50 flex items-center justify-between">
+                              <span>Status</span>
+                              <button
+                                onClick={onRefresh}
+                                className="text-gray-600 hover:text-gray-900"
+                                title="Refresh documents"
+                              >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                              </button>
+                            </th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Actions</th>
                           </tr>
                         </thead>

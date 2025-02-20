@@ -12,6 +12,7 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+
 };
 
 // Initialize Firebase only if it hasn't been initialized
@@ -41,7 +42,7 @@ else if (process.env.NODE_ENV === 'development') {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099');
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectStorageEmulator(storage, '127.0.0.1', 9199);
-  
+
   console.log('Firebase emulators connected - Development Mode');
 }
 else {

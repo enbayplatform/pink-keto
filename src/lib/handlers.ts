@@ -8,6 +8,7 @@ import randomName from './utils'
 import { Document } from './document';
 import { checkUserCredits } from './credit';
 import { CSVSchema } from './csvschema';
+import { sys } from 'typescript';
 
 // Document collection and status constants
 export const DOCUMENT_COLLECTION = 'documents';
@@ -16,6 +17,14 @@ export const DOCUMENT_STATUS_PENDING = 'pending';
 export const DOCUMENT_STATUS_PROCESSING = 'processing';
 export const DOCUMENT_STATUS_COMPLETE = 'complete';
 export const DOCUMENT_STATUS_FAILED = 'failed';
+
+export const PROMT_TO_CSV = (columns:string) => {
+  return `You are an expert data extractor for invoices.
+    Extract the following columns from each invoice provided and return the data in CSV format:[${columns}].
+    Output the data as a CSV file. Any field value containing a comma (,)
+    must be enclosed in double quotes (") eg: 1,234,567 -> "1,234,567", eg2: Adam, John -> "Adam, John".
+    If any data is missing, leave the field with "".`
+}
 
 async function getNextDocumentId(): Promise<number> {
   const user = auth.currentUser;
@@ -346,12 +355,14 @@ export const handleExport = async (
 
     // Convert documents to CSV
     const columns = schema?.columns||'';
-
+    //console.log(`You are an expert in extracting data from invoices. Your task is to extract the following columns from invoices and return the data in CSV format: ${columns}`)
     // Prepare documents XML
-    const documentsXml = `<invoices>${documents.map(doc =>
-      `<invoice>${doc.text || ''}</invoice>`
-    ).join('')}</invoices>`;
-
+    const documentsXml = `<invoices>\n${documents.map(doc =>
+      `\n<invoice>${doc.text || ''}</invoice>`
+    ).join('')}\n</invoices>`;
+    const systemPrompt = PROMT_TO_CSV(columns);
+    //console.log(systemPrompt);
+    //console.log(documentsXml);
     // Call AI API for data extraction
     const response = await fetchWithAuth(config.api.airequest, {
       method: 'POST',
@@ -362,7 +373,7 @@ export const handleExport = async (
         messages: [
           {
             role: "system",
-            content: `You are an expert in extracting data from invoices. Your task is to extract the following columns from invoices and return the data in CSV format: ${columns}`
+            content: systemPrompt
           },
           {
             role: "user",
