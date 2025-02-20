@@ -16,6 +16,7 @@ import { Document as CustomDocument } from '../lib/document';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CSVSchema } from '../lib/csvschema';
+import Cookies from 'js-cookie';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -23,6 +24,11 @@ function Dashboard() {
   const [documents, setDocuments] = useState<CustomDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState<number>(() => {
+    // Initialize from cookie or default to 2 (20 items)
+    const savedSize = Cookies.get('preferredPageSize');
+    return savedSize ? parseInt(savedSize) : 2;
+  });
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [hasPrevious, setHasPrevious] = useState(false);
@@ -62,7 +68,8 @@ function Dashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showTextPopup, selectedDocIndex, documents.length]);
 
-  const handleTextClick = (index: number) => {
+  // Handle document click for both text and image
+  const handleDocumentClick = (index: number) => {
     setSelectedDocIndex(index);
     setShowTextPopup(true);
   };
@@ -73,7 +80,7 @@ function Dashboard() {
       setError(null);
       setCurrentStatus(status);
 
-      const result = await loadFirstPage(status === 'all' ? null : status);
+      const result = await loadFirstPage(status === 'all' ? null : status, pageSize);
       setDocuments(result.documents);
       setHasMore(result.hasMore);
       setHasPrevious(result.hasPrevious);
@@ -90,7 +97,7 @@ function Dashboard() {
       setIsLoading(true);
       setError(null);
 
-      const result = await loadNextPage(currentStatus === 'all' ? null : currentStatus);
+      const result = await loadNextPage(currentStatus === 'all' ? null : currentStatus, pageSize);
       if (result.documents.length > 0) {
         setDocuments(result.documents);
         setHasMore(result.hasMore);
@@ -109,7 +116,7 @@ function Dashboard() {
       setIsLoading(true);
       setError(null);
 
-      const result = await loadPreviousPage(currentStatus === 'all' ? null : currentStatus);
+      const result = await loadPreviousPage(currentStatus === 'all' ? null : currentStatus, pageSize);
       if (result.documents.length > 0) {
         setDocuments(result.documents);
         setHasMore(result.hasMore);
@@ -212,7 +219,7 @@ function Dashboard() {
       setError(null);
       // Get the current status from the StatusFilter component
       const status = currentStatus === 'all' ? null : currentStatus;
-      const result = await loadFirstPage(status);
+      const result = await loadFirstPage(status, pageSize);
       setDocuments(result.documents);
       setHasMore(result.hasMore);
       setHasPrevious(result.hasPrevious);
@@ -334,7 +341,7 @@ function Dashboard() {
       await deleteDocument(doc.id, doc.originalGS, doc.thumbnailGS);
 
       // Refresh the documents list after deletion
-      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
+      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus, pageSize);
       setDocuments(result.documents);
       setHasMore(result.hasMore);
       setHasPrevious(result.hasPrevious);
@@ -388,7 +395,7 @@ function Dashboard() {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       // Delete each selected document
       for (const docId of selectedDocumentIds) {
         const doc = documents.find(d => d.id === docId);
@@ -396,16 +403,16 @@ function Dashboard() {
           await deleteDocument(doc.id, doc.originalGS, doc.thumbnailGS);
         }
       }
-      
+
       // Clear selection
       setSelectedDocumentIds([]);
-      
+
       // Refresh the document list
-      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus);
+      const result = await loadFirstPage(currentStatus === 'all' ? null : currentStatus, pageSize);
       setDocuments(result.documents);
       setHasMore(result.hasMore);
       setHasPrevious(result.hasPrevious);
-      
+
       setSuccessMessage('Selected documents deleted successfully');
     } catch (error) {
       console.error('Error deleting documents:', error);
@@ -426,7 +433,7 @@ function Dashboard() {
       if (user) {
         setIsLoading(true);
         try {
-          const result = await loadFirstPage(currentStatus);
+          const result = await loadFirstPage(currentStatus, pageSize);
           if (result.documents) {
             setDocuments(result.documents);
             setHasMore(result.hasMore);
@@ -442,7 +449,7 @@ function Dashboard() {
     };
 
     loadInitialDocuments();
-  }, [user, currentStatus]); // Reload when user or status changes
+  }, [user, currentStatus, pageSize]); // Reload when user or status changes
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -612,7 +619,8 @@ function Dashboard() {
                                     fill
                                     sizes="64px"
                                     unoptimized
-                                    className="object-cover rounded"
+                                    className="object-cover rounded cursor-pointer"
+                                    onClick={() => handleDocumentClick(index)}
                                   />
                                 </div>
                               </td>
@@ -622,7 +630,7 @@ function Dashboard() {
                               <td className="px-4 py-3">
                                 <p
                                   className="text-sm text-gray-900 line-clamp-2 cursor-pointer hover:text-blue-600"
-                                  onClick={() => handleTextClick(index)}
+                                  onClick={() => handleDocumentClick(index)}
                                 >
                                   {doc.text}
                                 </p>
@@ -669,67 +677,69 @@ function Dashboard() {
             </div>
 
             {/* Pagination controls */}
-            <div className="px-4 py-3 bg-gray-50 flex items-center justify-between rounded-b-lg border-t border-gray-200">
-              <div className="flex items-center">
+            <div className="flex items-center justify-between mt-4 mb-8">
+              <div className="flex items-center space-x-4">
                 <button
-                  onClick={handlePreviousPage}
+                  onClick={() => handlePreviousPage()}
                   disabled={!hasPrevious || isLoading}
-                  className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                    hasPrevious && !isLoading
-                      ? 'text-gray-700 bg-white hover:bg-gray-50 border border-gray-300'
-                      : 'text-gray-400 bg-gray-100 cursor-not-allowed border border-gray-200'
+                  className={`px-4 py-2 text-sm font-medium rounded-md ${
+                    !hasPrevious || isLoading
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  <svg
-                    className="mr-2 h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
                   Previous
                 </button>
-              </div>
-
-              <div className="hidden sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Showing <span className="font-medium">{documents.length}</span> results
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center">
                 <button
-                  onClick={handleNextPage}
+                  onClick={() => handleNextPage()}
                   disabled={!hasMore || isLoading}
-                  className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                    hasMore && !isLoading
-                      ? 'text-gray-700 bg-white hover:bg-gray-50 border border-gray-300'
-                      : 'text-gray-400 bg-gray-100 cursor-not-allowed border border-gray-200'
+                  className={`px-4 py-2 text-sm font-medium rounded-md ${
+                    !hasMore || isLoading
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
                   Next
-                  <svg
-                    className="ml-2 h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
                 </button>
+
+                <div className="flex items-center space-x-2">
+                  <label htmlFor="pageSize" className="text-sm text-gray-600">
+                    Items per page:
+                  </label>
+                  <select
+                    id="pageSize"
+                    value={pageSize}
+                    onChange={async (e) => {
+                      try {
+                        setIsLoading(true);
+                        const newSize = parseInt(e.target.value);
+                        setPageSize(newSize);
+
+                        // Save to cookie
+                        Cookies.set('preferredPageSize', newSize.toString(), { expires: 365 }); // Expires in 1 year
+
+                        const result = await searchDocuments(
+                          currentStatus === 'all' ? null : currentStatus,
+                          newSize
+                        );
+
+                        setDocuments(result.documents);
+                        setHasMore(result.hasMore);
+                        setHasPrevious(result.hasPrevious);
+                      } catch (error) {
+                        console.error('Error updating page size:', error);
+                        setError('Failed to update items per page');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  >
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
               </div>
             </div>
           </>
@@ -846,7 +856,7 @@ function Dashboard() {
               <div className="flex justify-center gap-4 mt-4">
                 <button
                   onClick={handleCancelDelete}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  className="px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                 >
                   No
                 </button>

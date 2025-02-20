@@ -11,8 +11,6 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
-const ITEMS_PER_PAGE = 15;
-
 interface SearchState {
     lastVisibleDocument: DocumentSnapshot | null;
     firstVisibleDocument: DocumentSnapshot | null;
@@ -43,6 +41,7 @@ export const getSearchState = () => ({
 
 export async function searchDocuments(
     status: string | null,
+    pageSize: number = 0,
     direction: 'next' | 'back' = 'next'
 ) {
     const user = auth.currentUser;
@@ -76,7 +75,7 @@ export async function searchDocuments(
         }
 
         // Add pagination
-        q = query(q, limit(ITEMS_PER_PAGE));
+        q = query(q, limit(pageSize));
 
         // Add cursor based on direction
         if (direction === 'next' && searchState.lastVisibleDocument) {
@@ -99,10 +98,10 @@ export async function searchDocuments(
 
         // Update pagination flags
         if (direction === 'next') {
-            searchState.hasMore = querySnapshot.docs.length === ITEMS_PER_PAGE;
+            searchState.hasMore = querySnapshot.docs.length === pageSize;
             searchState.hasPrevious = true;
         } else if (direction === 'back') {
-            searchState.hasPrevious = querySnapshot.docs.length === ITEMS_PER_PAGE;
+            searchState.hasPrevious = querySnapshot.docs.length === pageSize;
             searchState.hasMore = true;
         }
 
@@ -117,15 +116,15 @@ export async function searchDocuments(
     }
 }
 
-export async function loadFirstPage(status: string | null) {
+export async function loadFirstPage(status: string | null, pageSize: number = 20) {
     resetSearchState();
-    return searchDocuments(status);
+    return searchDocuments(status, pageSize);
 }
 
-export async function loadNextPage(status: string | null) {
-    return searchDocuments(status, 'next');
+export async function loadNextPage(status: string | null, pageSize: number = 20) {
+    return searchDocuments(status, pageSize, 'next');
 }
 
-export async function loadPreviousPage(status: string | null) {
-    return searchDocuments(status, 'back');
+export async function loadPreviousPage(status: string | null, pageSize: number = 20) {
+    return searchDocuments(status, pageSize, 'back');
 }
