@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { YouTubeVideo } from '@/components/YouTubeVideo';
 
 export default function Home() {
   return (
@@ -58,10 +59,9 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-r from-pink-400 to-purple-500 rounded-lg transform rotate-6 scale-105 opacity-20"></div>
               <div className="relative bg-white p-6 rounded-lg shadow-xl">
                 <div className="aspect-w-16 aspect-h-9 bg-gray-100 rounded-lg overflow-hidden">
-                  <img
-                    src="/hero.webp"
-                    alt="Document scanning illustration"
-                    className="w-full h-full object-cover"
+                  <YouTubeVideo
+                    videoId="09aqBFofx6Q"
+                    className="w-full h-full"
                   />
                 </div>
               </div>
