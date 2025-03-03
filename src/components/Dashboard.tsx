@@ -10,7 +10,7 @@ import StatusFilter from './StatusFilter';
 import SchemaModal from './SchemaModal';
 import { Timestamp } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
-import { handleFileChange, handleScan, deleteDocument, handleExport } from '@/lib/handlers';
+import { handleFileChange, handleScan, deleteDocument, handleExport, handleSelectAllRecent } from '@/lib/handlers';
 import { loadFirstPage, loadNextPage, loadPreviousPage, getSearchState, searchDocuments } from '@/lib/firebaseSearch';
 import { Document as CustomDocument } from '../lib/document';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -577,8 +577,17 @@ function Dashboard() {
                                 onChange={handleSelectAll}
                               />
                             </th>
-                            <th scope="col" className="px-4 py-3 bg-gray-50">
-                              Id
+                            <th scope="col" className="px-4 py-3 bg-gray-50 flex items-center">
+                              <span>Id</span>
+                              <button
+                                onClick={() => handleSelectAllRecent(documents, setSelectedDocumentIds, selectedDocumentIds)}
+                                className="ml-2 p-1 bg-blue-100 hover:bg-blue-200 rounded text-xs text-blue-700 flex items-center"
+                                title="Select all documents uploaded within 1 minute of the most recent one"
+                              >
+                                <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </button>
                             </th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Thumbnail</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-600 bg-gray-50">Date</th>
@@ -745,7 +754,7 @@ function Dashboard() {
           </>
         ) : (
           <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16c.452-1.162 1.158-2.507 2.246-3.172l1.414 1.414 1.414-1.414c1.088 1.664 2.794 2.99 4.622 3.172.558.104 1.038.176 1.542.176.504 0 1.024-.092 1.542-.176 1.828-1.182 3.534-1.508 4.622-3.172l1.414-1.414-1.414-1.414c-1.088-1.664-2.794-2.99-4.622-3.172-.558-.104-1.038-.176-1.542-.176-.504 0-1.024.092-1.542.176-1.828 1.182-3.534 1.508-4.622 3.172l-1.414 1.414-1.414-1.414zM10 11a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900">No documents found</h3>

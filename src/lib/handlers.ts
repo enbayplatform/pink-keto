@@ -237,7 +237,7 @@ export const handleFileChange = async (
     setHasPrevious(hasPrevious);
 
     if (setSuccessMessage) {
-      setSuccessMessage(`Successfully uploaded ${files.length} file${files.length > 1 ? 's' : ''}`);
+      setSuccessMessage(`Successfully uploaded ${uploadResults.length} file${uploadResults.length > 1 ? 's' : ''}`);
     }
   } catch (error) {
     console.error('Upload error:', error);
@@ -419,5 +419,78 @@ export const handleExport = async (
     setError?.(error instanceof Error ? error.message : 'An error occurred while exporting documents');
   } finally {
     setIsLoading?.(false);
+  }
+};
+
+export const handleSelectAllRecent = (
+  documents: Document[],
+  setSelectedDocumentIds: (ids: string[]) => void,
+  currentSelectedIds: string[]
+) => {
+  if (!documents || documents.length === 0) {
+    return;
+  }
+
+  // Get the most recent document's timestamp
+  const mostRecentDoc = documents[0]; // Assuming documents are already sorted by createdAt desc
+  if (!mostRecentDoc || !mostRecentDoc.createdAt) {
+    return;
+  }
+
+  let mostRecentTimestamp: Date;
+
+  // Handle Firebase Timestamp object or server timestamp
+  if (typeof mostRecentDoc.createdAt === 'object' && mostRecentDoc.createdAt !== null && 'seconds' in mostRecentDoc.createdAt) {
+    mostRecentTimestamp = new Date((mostRecentDoc.createdAt as any).seconds * 1000);
+  } else {
+    mostRecentTimestamp = new Date(mostRecentDoc.createdAt);
+  }
+
+  // If the date is invalid, return
+  if (isNaN(mostRecentTimestamp.getTime())) {
+    return;
+  }
+
+  // Select all documents that were created within 1 minute of the most recent document
+  const oneMinuteAgo = new Date(mostRecentTimestamp.getTime() - 60000); // 60000 ms = 1 minute
+
+  const recentDocIds = documents
+    .filter(doc => {
+      if (!doc.createdAt) return false;
+
+      let docTimestamp: Date;
+
+      // Handle Firebase Timestamp object or server timestamp
+      if (typeof doc.createdAt === 'object' && doc.createdAt !== null && 'seconds' in doc.createdAt) {
+        docTimestamp = new Date((doc.createdAt as any).seconds * 1000);
+      } else {
+        docTimestamp = new Date(doc.createdAt);
+      }
+
+      // If the date is invalid, skip this document
+      if (isNaN(docTimestamp.getTime())) return false;
+
+      // Check if the document was created within the last minute of the most recent document
+      return docTimestamp >= oneMinuteAgo;
+    })
+    .map(doc => doc.id);
+
+  // Check if all recent documents are already selected
+  const allRecentSelected = recentDocIds.every(id => currentSelectedIds.includes(id));
+
+  if (allRecentSelected) {
+    // If all recent docs are already selected, deselect them
+    const newSelection = currentSelectedIds.filter(id => !recentDocIds.includes(id));
+    setSelectedDocumentIds(newSelection);
+  } else {
+    // Otherwise, add the recent docs to the current selection
+    // Create a unique array without using Set spread which requires ES2015+
+    const combinedIds = [...currentSelectedIds];
+    recentDocIds.forEach(id => {
+      if (!combinedIds.includes(id)) {
+        combinedIds.push(id);
+      }
+    });
+    setSelectedDocumentIds(combinedIds);
   }
 };
