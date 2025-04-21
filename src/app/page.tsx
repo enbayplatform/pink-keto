@@ -239,6 +239,81 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Contact Section */}
+      <section id="contact" className="container mx-auto px-6 py-16 md:py-20">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-8">
+            Contact Us
+          </h2>
+          <p className="text-xl text-gray-600 text-center mb-12">
+            Have questions or need assistance? We're here to help!
+          </p>
+          
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="flex flex-col md:flex-row gap-8">
+              <div className="md:w-1/2">
+                <h3 className="text-xl font-semibold mb-4">Get in Touch</h3>
+                <p className="text-gray-600 mb-6">
+                  Fill out the form and our team will get back to you as soon as possible.
+                </p>
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center mr-4">
+                    <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Email</div>
+                    <a href="mailto:nguyen.code2020@gmail.com" className="text-pink-600 hover:underline">
+                      nguyen.code2020@gmail.com
+                    </a>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="md:w-1/2">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const subject = formData.get('subject') as string;
+                  const message = formData.get('message') as string;
+                  window.location.href = `mailto:nguyen.code2020@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+                }}>
+                  <div className="mb-4">
+                    <label htmlFor="subject" className="block text-gray-700 font-medium mb-2">Subject</label>
+                    <input
+                      type="text"
+                      id="subject"
+                      name="subject"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                      placeholder="What's this about?"
+                      required
+                    />
+                  </div>
+                  <div className="mb-6">
+                    <label htmlFor="message" className="block text-gray-700 font-medium mb-2">Message</label>
+                    <textarea
+                      id="message"
+                      name="message"
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                      placeholder="How can we help you?"
+                      required
+                    ></textarea>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full px-6 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors font-medium"
+                  >
+                    Send Message
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-gray-50 py-12">
         <div className="container mx-auto px-6">
